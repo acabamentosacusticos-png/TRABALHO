@@ -18,6 +18,18 @@ jobs:
       - name: Obter código
         uses: actions/checkout@v4
 
+      - name: Localizar o projeto
+        id: proj
+        run: |
+          f=$(find . -name settings.gradle.kts -not -path './.git/*' | head -n 1)
+          if [ -z "$f" ]; then
+            echo "Não encontrei o settings.gradle.kts. Ficheiros no repositório:"
+            find . -not -path './.git/*' | head -80
+            exit 1
+          fi
+          echo "Projeto encontrado em: $(dirname "$f")"
+          echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+
       - name: Instalar Java 17
         uses: actions/setup-java@v4
         with:
@@ -27,21 +39,19 @@ jobs:
       - name: Aceitar licenças do Android SDK
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
-      - name: Mostrar ficheiros do projeto
-        run: ls -la
-
       - name: Preparar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
 
       - name: Compilar APK Release
+        working-directory: ${{ steps.proj.outputs.dir }}
         run: gradle assembleRelease --no-daemon
 
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
           name: tv-launcher-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: ${{ steps.proj.outputs.dir }}/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 7
